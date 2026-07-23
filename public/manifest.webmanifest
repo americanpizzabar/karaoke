@@ -1,0 +1,18 @@
+{
+  "name": "音域アタック",
+  "short_name": "音域アタック",
+  "description": "音域測定×キー攻略×ボイトレのカラオケ攻略アプリ",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0A0D1F",
+  "theme_color": "#0A0D1F",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getDb } from "@/lib/db";
+import { attachUserCookie, resolveUser } from "@/lib/auth";
+
+export const runtime = "nodejs";
+
+const MENUS = ["liproll", "longtone", "challenge", "falsetto_slide"] as const;
+
+export async function GET(req: NextRequest) {
+  const session = await resolveUser(req);
+  const rows = await getDb().execute({
+    sql: `select id, menu, target_note, achieved, stability_cents, done_at
+          from training_logs where user_id = ?
+          order by done_at desc, rowid desc limit 200`,
+    args: [session.userId],
+  });
+  const res = NextResponse.json({
+    logs: rows.rows.map((r) => ({
+      id: r.id,
+      menu: r.menu,
+      targetNote: r.target_note,
+      achieved: r.achieved === null ? null : Number(r.achieved) === 1,
+      stabilityCents: r.stability_cents,
+      doneAt: r.done_at,
+    })),
+  });
+  if (session.isNew) attachUserCookie(res, session.userId);
+  return res;
+}
+
+export async function POST(req: NextRequest) {
+  const session = await resolveUser(req);
+  const body = await req.json().catch(() => null);
+  if (!body || !MENUS.includes(body.menu)) {
+    return NextResponse.json({ error: "invalid body" }, { status: 400 });
+  }
+  const id = crypto.randomUUID();
+  const targetNote = Number.isFinite(Number(body.targetNote)) ? Math.round(Number(body.targetNote)) : null;
+  const stability = Number.isFinite(Number(body.stabilityCents)) ? Number(body.stabilityCents) : null;
+  await getDb().execute({
+    sql: `insert into training_logs (id, user_id, menu, target_note, achieved, stability_cents)
+          values (?, ?, ?, ?, ?, ?)`,
+    args: [
+      id,
+      session.userId,
+      body.menu,
+      targetNote,
+      typeof body.achieved === "boolean" ? (body.achieved ? 1 : 0) : null,
+      stability,
+    ],
+  });
+  const res = NextResponse.json({ id }, { status: 201 });
+  if (session.isNew) attachUserCookie(res, session.userId);
+  return res;
+}
