@@ -8,7 +8,7 @@ import { RMS_THRESHOLD } from "@/lib/pitch";
 import { midiToFreq, midiToFullLabel, midiToKaraoke, midiToScientific } from "@/lib/notes";
 import { fetchRangeHistory, useAppStore } from "@/store/useAppStore";
 
-const HOLD_MS = 1600; // 同一音程(±1半音)をこの時間連続検出したら自動記録
+const HOLD_MS = 1600; // 同一音程(±1半音)をこの時間連続検出したら候補として記録(確定は手動)
 
 type PhaseKey = "chestLow" | "chestHigh" | "falsettoHigh";
 
@@ -51,6 +51,7 @@ export default function MeasurePage() {
   const [saved, setSaved] = useState<"idle" | "saving" | "done" | "error">("idle");
   const [holdProgress, setHoldProgress] = useState(0);
   const [flash, setFlash] = useState<string | null>(null);
+  const [candidate, setCandidate] = useState<number | null>(null);
 
   const candidateRef = useRef<number | null>(null);
   const holdStartRef = useRef(0);
@@ -68,10 +69,8 @@ export default function MeasurePage() {
       candidateRef.current = null;
       samplesRef.current = [];
       setHoldProgress(0);
-      if (recorded !== null) {
-        setFlash(`${midiToKaraoke(recorded)} を記録!`);
-        setTimeout(() => setFlash(null), 1200);
-      }
+      setCandidate(null);
+      setFlash(null);
       if (phaseIdxRef.current >= PHASES.length - 1) {
         setFinished(true);
         stop();
@@ -102,9 +101,16 @@ export default function MeasurePage() {
       const held = now - holdStartRef.current;
       setHoldProgress(Math.min(held / HOLD_MS, 1));
       if (held >= HOLD_MS) {
+        // 候補として記録し、確定はユーザーの「次へ」操作に委ねる
         const sorted = [...samplesRef.current].sort((a, b) => a - b);
         const median = sorted[Math.floor(sorted.length / 2)];
-        advance(Math.round(median));
+        const note = Math.round(median);
+        setCandidate(note);
+        setFlash(`${midiToKaraoke(note)} をキャッチ!`);
+        setTimeout(() => setFlash(null), 1200);
+        candidateRef.current = null;
+        samplesRef.current = [];
+        setHoldProgress(0);
       }
     } else {
       candidateRef.current = rounded;
@@ -119,6 +125,7 @@ export default function MeasurePage() {
     setResult({ chestLow: null, chestHigh: null, falsettoHigh: null });
     setFinished(false);
     setSaved("idle");
+    setCandidate(null);
     candidateRef.current = null;
   };
 
@@ -228,10 +235,43 @@ export default function MeasurePage() {
                   />
                 </div>
                 <p className="muted" style={{ marginTop: 8 }}>
-                  同じ音を{(HOLD_MS / 1000).toFixed(1)}秒キープすると自動記録
+                  同じ音を{(HOLD_MS / 1000).toFixed(1)}秒キープすると候補に記録。
+                  やり直したいときはもう一度発声してください。
                 </p>
 
-                <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
+                <p style={{ marginTop: 12, minHeight: 24 }}>
+                  {candidate !== null ? (
+                    <>
+                      記録候補:{" "}
+                      <span
+                        className="led"
+                        style={{ color: "var(--chest)", fontSize: 18 }}
+                      >
+                        {midiToKaraoke(candidate)}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="muted">記録候補: まだありません</span>
+                  )}
+                </p>
+
+                <div
+                  style={{
+                    marginTop: 12,
+                    display: "flex",
+                    gap: 8,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <button
+                    className="btn btn-accent"
+                    disabled={candidate === null}
+                    onClick={() => advance(candidate)}
+                  >
+                    {phaseIdx >= PHASES.length - 1
+                      ? "この音で完了"
+                      : "この音で次へ →"}
+                  </button>
                   <button className="btn btn-ghost" onClick={() => advance(null)}>
                     スキップ
                   </button>
