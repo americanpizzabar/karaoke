@@ -3,31 +3,30 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePitchDetector } from "@/hooks/usePitchDetector";
-import { PitchMeter } from "@/components/PitchMeter";
-import { RMS_THRESHOLD } from "@/lib/pitch";
-import { midiToFreq, midiToFullLabel, midiToKaraoke, midiToScientific } from "@/lib/notes";
+import { ChannelStrip } from "@/components/ChannelStrip";
+import { TunerFace } from "@/components/TunerFace";
+import { SegmentDisplay } from "@/components/SegmentDisplay";
+import { Nameplate, exportNameplateImage } from "@/components/Nameplate";
+import { midiToKaraoke } from "@/lib/notes";
 import { fetchRangeHistory, useAppStore } from "@/store/useAppStore";
 
 const HOLD_MS = 1600; // 同一音程(±1半音)をこの時間連続検出したら候補として記録(確定は手動)
 
 type PhaseKey = "chestLow" | "chestHigh" | "falsettoHigh";
 
-const PHASES: { key: PhaseKey; step: string; title: string; desc: string }[] = [
+const PHASES: { key: PhaseKey; title: string; desc: string }[] = [
   {
     key: "chestLow",
-    step: "①",
     title: "低い声",
     desc: "出せる一番低い声で「あー」と2秒キープ",
   },
   {
     key: "chestHigh",
-    step: "②",
     title: "地声の高音",
-    desc: "裏声にせず、地声で出せる一番高い声を2秒キープ",
+    desc: "裏声にせず、いちばん高い声で2秒キープ",
   },
   {
     key: "falsettoHigh",
-    step: "③",
     title: "裏声の高音",
     desc: "裏声で出せる一番高い声を2秒キープ(出せなければスキップ)",
   },
@@ -50,8 +49,8 @@ export default function MeasurePage() {
   const [finished, setFinished] = useState(false);
   const [saved, setSaved] = useState<"idle" | "saving" | "done" | "error">("idle");
   const [holdProgress, setHoldProgress] = useState(0);
-  const [flash, setFlash] = useState<string | null>(null);
   const [candidate, setCandidate] = useState<number | null>(null);
+  const [sweepToken, setSweepToken] = useState(0);
 
   const candidateRef = useRef<number | null>(null);
   const holdStartRef = useRef(0);
@@ -70,7 +69,6 @@ export default function MeasurePage() {
       samplesRef.current = [];
       setHoldProgress(0);
       setCandidate(null);
-      setFlash(null);
       if (phaseIdxRef.current >= PHASES.length - 1) {
         setFinished(true);
         stop();
@@ -81,7 +79,7 @@ export default function MeasurePage() {
     [stop]
   );
 
-  // ホールド判定: 現在音が candidate ±1半音なら継続、HOLD_MS で自動記録
+  // ホールド判定: 現在音が candidate ±1半音なら継続、HOLD_MS で候補記録
   useEffect(() => {
     if (!active || finished) return;
     const midi = state.midi;
@@ -106,8 +104,7 @@ export default function MeasurePage() {
         const median = sorted[Math.floor(sorted.length / 2)];
         const note = Math.round(median);
         setCandidate(note);
-        setFlash(`${midiToKaraoke(note)} をキャッチ!`);
-        setTimeout(() => setFlash(null), 1200);
+        setSweepToken((t) => t + 1); // 記録完了: ストリップ点灯 + HOLD 点滅
         candidateRef.current = null;
         samplesRef.current = [];
         setHoldProgress(0);
@@ -118,7 +115,7 @@ export default function MeasurePage() {
       samplesRef.current = [midi];
       setHoldProgress(0);
     }
-  }, [state, active, finished, advance]);
+  }, [state, active, finished]);
 
   const restart = () => {
     setPhaseIdx(0);
@@ -141,11 +138,30 @@ export default function MeasurePage() {
   }
 
   const phase = PHASES[phaseIdx];
-  const cur = state.midi;
 
   return (
     <main>
-      <h1 className="page-title">音域測定</h1>
+      {/* 刻印のみのヘッダー(S2: ヘッダーもナビも消す) */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          margin: "4px 0 14px",
+        }}
+      >
+        <span className="etch-label">
+          RANGE FINDER — STEP {phaseIdx + 1}/3
+        </span>
+        <Link
+          href="/"
+          className="etch-label"
+          onClick={() => stop()}
+          aria-label="測定をやめてホームへ戻る"
+        >
+          EXIT
+        </Link>
+      </div>
 
       {!active ? (
         <section className="card">
@@ -158,7 +174,7 @@ export default function MeasurePage() {
           </p>
           {error && (
             <p className="warn" style={{ marginBottom: 12 }}>
-              {error}
+              NO INPUT — {error}
             </p>
           )}
           <button className="btn btn-accent btn-block" onClick={() => start()}>
@@ -167,60 +183,18 @@ export default function MeasurePage() {
         </section>
       ) : (
         <>
-          <section className="card" aria-live="polite">
-            <div className="muted">
-              STEP {phase.step}({phaseIdx + 1}/3)
-            </div>
-            <strong style={{ fontSize: 18 }}>{phase.title}</strong>
-            <p className="muted" style={{ marginTop: 4 }}>
-              {phase.desc}
-            </p>
-          </section>
-
           <section className="card">
-            <div className="meter-wrap">
-              <div style={{ position: "relative" }}>
-                <PitchMeter
-                  currentMidi={cur}
-                  chestLow={result.chestLow}
-                  chestHigh={result.chestHigh}
-                  falsettoHigh={result.falsettoHigh}
-                />
-              </div>
+            <div style={{ display: "flex", gap: 12 }}>
+              <ChannelStrip
+                currentMidi={state.midi}
+                chestLow={result.chestLow}
+                chestHigh={result.chestHigh}
+                falsettoHigh={result.falsettoHigh}
+                sweepToken={sweepToken}
+                height={330}
+              />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="note-display" aria-live="polite">
-                  {flash ?? (cur !== null ? midiToKaraoke(cur) : "‥‥")}
-                </div>
-                <div className="note-sub led">
-                  {cur !== null
-                    ? `${midiToScientific(cur)} / ${midiToFreq(Math.round(cur)).toFixed(0)}Hz`
-                    : state.rms < RMS_THRESHOLD
-                      ? "声を出してください"
-                      : "音程を検出中…"}
-                </div>
-                <div style={{ marginTop: 10 }}>
-                  <div className="muted" style={{ fontSize: 10, marginBottom: 3 }}>
-                    MIC LEVEL
-                  </div>
-                  <div className="hold-bar" style={{ marginTop: 0, height: 5 }}>
-                    <div
-                      style={{
-                        height: "100%",
-                        borderRadius: 999,
-                        width: `${Math.min(100, (state.rms / 0.06) * 100)}%`,
-                        background:
-                          state.rms < RMS_THRESHOLD
-                            ? "var(--muted)"
-                            : "var(--falsetto)",
-                      }}
-                    />
-                  </div>
-                  {state.rms > 0 && state.rms < RMS_THRESHOLD && (
-                    <p className="warn" style={{ marginTop: 4 }}>
-                      入力音量が小さいようです。マイクに口を近づけて(20cmほど)、少し大きめに発声してください。
-                    </p>
-                  )}
-                </div>
+                <TunerFace midi={state.midi} rms={state.rms} recording />
                 <div
                   className="hold-bar"
                   role="progressbar"
@@ -234,58 +208,66 @@ export default function MeasurePage() {
                     style={{ width: `${holdProgress * 100}%` }}
                   />
                 </div>
-                <p className="muted" style={{ marginTop: 8 }}>
-                  同じ音を{(HOLD_MS / 1000).toFixed(1)}秒キープすると候補に記録。
-                  やり直したいときはもう一度発声してください。
-                </p>
-
-                <p style={{ marginTop: 12, minHeight: 24 }}>
-                  {candidate !== null ? (
-                    <>
-                      記録候補:{" "}
-                      <span
-                        className="led"
-                        style={{ color: "var(--chest)", fontSize: 18 }}
-                      >
-                        {midiToKaraoke(candidate)}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="muted">記録候補: まだありません</span>
-                  )}
-                </p>
-
-                <div
-                  style={{
-                    marginTop: 12,
-                    display: "flex",
-                    gap: 8,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <button
-                    className="btn btn-accent"
-                    disabled={candidate === null}
-                    onClick={() => advance(candidate)}
-                  >
-                    {phaseIdx >= PHASES.length - 1
-                      ? "この音で完了"
-                      : "この音で次へ →"}
-                  </button>
-                  <button className="btn btn-ghost" onClick={() => advance(null)}>
-                    スキップ
-                  </button>
-                  <button
-                    className="btn btn-ghost"
-                    onClick={() => {
-                      stop();
-                      restart();
-                    }}
-                  >
-                    中止
-                  </button>
-                </div>
               </div>
+            </div>
+          </section>
+
+          {/* 指示は日本語(刻印=機材の声、本文=コーチの声) */}
+          <section className="card" aria-live="polite">
+            <strong style={{ fontSize: 15 }}>{phase.title}</strong>
+            <p className="muted" style={{ marginTop: 4 }}>
+              {phase.desc}
+            </p>
+            <div
+              style={{
+                marginTop: 12,
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                minHeight: 28,
+              }}
+            >
+              <span className="etch-label">CAPTURED</span>
+              {candidate !== null ? (
+                <SegmentDisplay
+                  value={midiToKaraoke(candidate)}
+                  color="amber"
+                  cellHeight={24}
+                  aria-label={`記録候補 ${midiToKaraoke(candidate)}`}
+                />
+              ) : (
+                <span className="muted">
+                  同じ音を{(HOLD_MS / 1000).toFixed(1)}秒キープで記録
+                </span>
+              )}
+            </div>
+            <div
+              style={{
+                marginTop: 12,
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+              }}
+            >
+              <button
+                className="btn btn-accent"
+                disabled={candidate === null}
+                onClick={() => advance(candidate)}
+              >
+                {phaseIdx >= PHASES.length - 1 ? "この音で完了" : "この音で次へ"}
+              </button>
+              <button className="btn btn-ghost" onClick={() => advance(null)}>
+                スキップ
+              </button>
+              <button
+                className="btn btn-ghost"
+                onClick={() => {
+                  stop();
+                  restart();
+                }}
+              >
+                中止
+              </button>
             </div>
           </section>
 
@@ -311,6 +293,7 @@ function ResultView({
   onRestart: () => void;
 }) {
   const invalidate = useAppStore((s) => s.invalidateRange);
+  const history = useAppStore((s) => s.rangeHistory);
   const savedOnce = useRef(false);
 
   useEffect(() => {
@@ -336,107 +319,63 @@ function ResultView({
       .catch(() => setSaved("error"));
   }, [result, setSaved, invalidate]);
 
-  const shareImage = async () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 1080;
-    canvas.height = 1080;
-    const ctx = canvas.getContext("2d")!;
-    try {
-      await document.fonts.load('700 64px "DotGothic16"');
-    } catch {
-      /* フォント未ロードでも描画は続行 */
-    }
-    ctx.fillStyle = "#0A0D1F";
-    ctx.fillRect(0, 0, 1080, 1080);
-    ctx.fillStyle = "#FF4D8D";
-    ctx.font = '700 72px "DotGothic16", monospace';
-    ctx.textAlign = "center";
-    ctx.fillText("音域アタック", 540, 160);
-    ctx.fillStyle = "#8B92B0";
-    ctx.font = '400 36px "Zen Kaku Gothic New", sans-serif';
-    ctx.fillText("MY VOCAL RANGE", 540, 230);
-
-    const rows: [string, number | null, string][] = [
-      ["最低音", result.chestLow, "#EDEFF7"],
-      ["地声最高音", result.chestHigh, "#F5B841"],
-      ["裏声最高音", result.falsettoHigh, "#7FD6FF"],
-    ];
-    rows.forEach(([label, midi, color], i) => {
-      const y = 420 + i * 190;
-      ctx.fillStyle = "#8B92B0";
-      ctx.font = '400 40px "Zen Kaku Gothic New", sans-serif';
-      ctx.fillText(label, 540, y - 80);
-      ctx.fillStyle = color;
-      ctx.font = '700 96px "DotGothic16", monospace';
-      ctx.fillText(midi !== null ? midiToKaraoke(midi) : "—", 540, y + 10);
-    });
-
-    ctx.fillStyle = "#1C2342";
-    ctx.fillRect(140, 990, 800, 2);
-    ctx.fillStyle = "#8B92B0";
-    ctx.font = '400 30px "Zen Kaku Gothic New", sans-serif';
-    ctx.fillText("#音域アタック", 540, 1045);
-
-    const url = canvas.toDataURL("image/png");
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "oniki-attack-range.png";
-    a.click();
+  const data = {
+    ...result,
+    measuredAt: history?.[0]?.measuredAt ?? new Date().toISOString(),
+    serial: history ? history.length : null, // 測定通し番号
   };
 
   return (
     <main>
-      <h1 className="page-title">測定結果</h1>
-      <section className="card">
-        <div className="range-summary">
-          <div>
-            <div className="muted">最低音</div>
-            <div className="val val-low led">
-              {result.chestLow !== null ? midiToKaraoke(result.chestLow) : "—"}
-            </div>
-          </div>
-          <div>
-            <div className="muted">地声最高</div>
-            <div className="val val-chest led">
-              {result.chestHigh !== null ? midiToKaraoke(result.chestHigh) : "—"}
-            </div>
-          </div>
-          <div>
-            <div className="muted">裏声最高</div>
-            <div className="val val-falsetto led">
-              {result.falsettoHigh !== null
-                ? midiToKaraoke(result.falsettoHigh)
-                : "—"}
-            </div>
-          </div>
-        </div>
-        <div style={{ marginTop: 12 }}>
-          {result.chestLow !== null && (
-            <p className="muted">最低音: {midiToFullLabel(result.chestLow)}</p>
-          )}
-          {result.chestHigh !== null && (
-            <p className="muted">地声最高音: {midiToFullLabel(result.chestHigh)}</p>
-          )}
-          {result.falsettoHigh !== null && (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          margin: "4px 0 14px",
+        }}
+      >
+        <span className="etch-label">RANGE FINDER — RESULT</span>
+        <Link href="/" className="etch-label">
+          EXIT
+        </Link>
+      </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <Nameplate data={data} />
+      </div>
+
+      {/* 音域スパンの静止画(チャンネルストリップ) */}
+      <section className="card" aria-label="音域スパン">
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+          <ChannelStrip
+            currentMidi={null}
+            chestLow={result.chestLow}
+            chestHigh={result.chestHigh}
+            falsettoHigh={result.falsettoHigh}
+            height={240}
+          />
+          <div style={{ flex: 1 }}>
             <p className="muted">
-              裏声最高音: {midiToFullLabel(result.falsettoHigh)}
+              {saved === "saving" && "保存中..."}
+              {saved === "done" && "測定履歴に保存しました。"}
+              {saved === "error" && "保存に失敗しました(オフラインの可能性)。"}
+              {saved === "idle" && "記録された音がないため保存されませんでした。"}
             </p>
-          )}
+          </div>
         </div>
-        <p className="muted" style={{ marginTop: 10 }}>
-          {saved === "saving" && "保存中..."}
-          {saved === "done" && "測定履歴に保存しました。"}
-          {saved === "error" && "保存に失敗しました(オフラインの可能性)。"}
-          {saved === "idle" && "記録された音がないため保存されませんでした。"}
-        </p>
       </section>
 
-      <button className="btn btn-block" onClick={shareImage} style={{ marginBottom: 10 }}>
+      <button
+        className="btn btn-block"
+        onClick={() => exportNameplateImage(data)}
+        style={{ marginBottom: 10 }}
+      >
         シェア画像を保存
       </button>
       <Link href="/songs">
         <button className="btn btn-accent btn-block" style={{ marginBottom: 10 }}>
-          この音域で歌える曲を探す →
+          この音域で歌える曲を探す
         </button>
       </Link>
       <button className="btn btn-ghost btn-block" onClick={onRestart}>

@@ -1,14 +1,37 @@
+/* ============================================================
+   音域アタック — 「声の計測器」デザイントークン
+   ビジュアルデザイン仕様書 v1.0 準拠
+   ============================================================ */
+
 :root {
-  --bg: #0a0d1f;
-  --panel: #12172e;
-  --line: #1c2342;
-  --chest: #f5b841;
-  --falsetto: #7fd6ff;
-  --accent: #ff4d8d;
-  --text: #edeff7;
-  --muted: #8b92b0;
-  --font-led: "DotGothic16", monospace;
-  --font-body: "Zen Kaku Gothic New", sans-serif;
+  /* カラーパレット(2.1) */
+  --chassis: #15171c; /* アプリ背景(機材の筐体色) */
+  --faceplate: #1e2229; /* カード/パネル背景 */
+  --groove: #2a2f38; /* 罫線、目盛り、非アクティブLED */
+  --phosphor-amber: #ffb454; /* 地声。セグメント表示 */
+  --phosphor-cyan: #7df0d4; /* 裏声。VFD管の発光色 */
+  --signal-red: #e8442e; /* REC・警告・ピークのみ */
+  --ink: #e9eaee; /* 主要テキスト */
+  --etch: #868d99; /* ラベル、補足(刻印) */
+
+  /* グロー(発光色は必ずセットで使う) */
+  --glow-amber: 0 0 8px rgba(255, 180, 84, 0.35);
+  --glow-cyan: 0 0 8px rgba(125, 240, 212, 0.35);
+  --glow-red: 0 0 8px rgba(232, 68, 46, 0.35);
+
+  /* タイポグラフィ(2.2) */
+  --font-data: "IBM Plex Mono", ui-monospace, monospace;
+  --font-body: "IBM Plex Sans JP", "IBM Plex Sans", sans-serif;
+
+  /* 旧トークン互換(段階的移行用エイリアス) */
+  --bg: var(--chassis);
+  --panel: var(--faceplate);
+  --line: var(--groove);
+  --chest: var(--phosphor-amber);
+  --falsetto: var(--phosphor-cyan);
+  --accent: var(--phosphor-amber);
+  --text: var(--ink);
+  --muted: var(--etch);
 }
 
 * {
@@ -19,10 +42,22 @@
 
 html,
 body {
-  background: var(--bg);
-  color: var(--text);
+  background: var(--chassis);
+  color: var(--ink);
   font-family: var(--font-body);
+  font-size: 15px;
   min-height: 100dvh;
+}
+
+/* シャーシの微細ノイズ(2%のみ許可。グラデーション禁止) */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.02;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 a {
@@ -36,53 +71,89 @@ button {
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--phosphor-amber);
   outline-offset: 2px;
 }
 
 .app-shell {
+  position: relative;
+  z-index: 1;
   max-width: 480px;
   margin: 0 auto;
   padding: 16px 16px 84px;
   min-height: 100dvh;
 }
 
-.led {
-  font-family: var(--font-led);
-  letter-spacing: 0.04em;
+/* 画面遷移: 120msのopacityのみ(5章) */
+.page-fade {
+  animation: page-fade-in 120ms linear;
+}
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---------- タイポグラフィロール ---------- */
+
+/* データ(Hz、セント、日付、数値) */
+.data {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+/* 刻印ラベル: 大文字英語+字間0.12em+10–11px */
+.etch-label {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--etch);
 }
 
 .page-title {
-  font-family: var(--font-led);
-  font-size: 22px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 18px;
   margin: 4px 0 16px;
 }
 
+/* ---------- パネル(フェースプレート) ---------- */
+
 .card {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 14px;
+  background: var(--faceplate);
+  border: 1px solid var(--groove);
+  border-top-color: rgba(255, 255, 255, 0.06); /* 金属の面取り */
+  border-radius: 6px;
   padding: 16px;
   margin-bottom: 14px;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
 }
 
 .muted {
-  color: var(--muted);
+  color: var(--etch);
   font-size: 13px;
 }
+
+/* ---------- ボタン ---------- */
 
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  color: var(--text);
-  border-radius: 12px;
+  border: 1px solid var(--groove);
+  background: var(--faceplate);
+  color: var(--ink);
+  border-radius: 4px;
   padding: 12px 18px;
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .btn:disabled {
@@ -90,11 +161,13 @@ button {
   cursor: not-allowed;
 }
 
+/* CTA: amber(signal-redはCTAに使わない) */
 .btn-accent {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-  box-shadow: 0 0 18px rgba(255, 77, 141, 0.45);
+  background: rgba(255, 180, 84, 0.1);
+  border-color: var(--phosphor-amber);
+  color: var(--phosphor-amber);
+  text-shadow: var(--glow-amber);
+  box-shadow: inset 0 0 12px rgba(255, 180, 84, 0.08), 0 2px 0 rgba(0, 0, 0, 0.4);
 }
 
 .btn-ghost {
@@ -105,41 +178,56 @@ button {
   width: 100%;
 }
 
+.btn-danger {
+  border-color: var(--signal-red);
+  color: var(--signal-red);
+  background: transparent;
+}
+
+/* ---------- バッジ(判定インジケータ) ---------- */
+
 .badge {
   display: inline-block;
-  border-radius: 999px;
-  padding: 3px 10px;
-  font-size: 12px;
-  font-weight: 700;
-  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 3px 8px;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid var(--groove);
+  color: var(--etch);
 }
 
 .badge-easy {
-  color: #6ee7a0;
-  border-color: #6ee7a0;
+  color: var(--phosphor-cyan);
+  border-color: var(--phosphor-cyan);
+  text-shadow: var(--glow-cyan);
 }
 .badge-edge {
-  color: var(--chest);
-  border-color: var(--chest);
+  color: var(--phosphor-amber);
+  border-color: var(--phosphor-amber);
+  text-shadow: var(--glow-amber);
 }
 .badge-shift {
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--phosphor-amber);
+  border-color: var(--phosphor-amber);
 }
 .badge-octave {
-  color: var(--falsetto);
-  border-color: var(--falsetto);
+  color: var(--etch);
+  border-color: var(--etch);
 }
 
-/* 下部タブナビ */
+/* ---------- 下部タブナビ ---------- */
+
 .tabbar {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(10, 13, 31, 0.92);
+  background: rgba(21, 23, 28, 0.94);
   backdrop-filter: blur(8px);
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--groove);
   display: flex;
   justify-content: center;
   z-index: 50;
@@ -156,128 +244,72 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 10px 0 max(10px, env(safe-area-inset-bottom));
-  color: var(--muted);
-  font-size: 10px;
+  gap: 5px;
+  padding: 12px 0 max(12px, env(safe-area-inset-bottom));
+  color: var(--etch);
+  font-size: 11px;
+  font-weight: 500;
 }
 
-.tab .tab-icon {
-  font-size: 18px;
-  line-height: 1;
+/* タブのLED素子: 60ms点灯、イージングなし */
+.tab-led {
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--groove);
 }
 
 .tab.active {
-  color: var(--accent);
+  color: var(--ink);
 }
 
-/* 縦型LEDピッチメーター */
-.meter-wrap {
-  display: flex;
-  gap: 16px;
+.tab.active .tab-led {
+  background: var(--phosphor-amber);
+  box-shadow: var(--glow-amber);
 }
 
-.meter-col {
-  display: flex;
-  flex-direction: column-reverse;
-  gap: 2px;
-  width: 64px;
-  flex-shrink: 0;
+/* ---------- 入力 ---------- */
+
+.input {
+  width: 100%;
+  background: var(--chassis);
+  border: 1px solid var(--groove);
+  border-radius: 4px;
+  color: var(--ink);
+  padding: 12px 14px;
+  font-size: 15px;
+  font-family: inherit;
 }
 
-.meter-seg {
+.input::placeholder {
+  color: var(--etch);
+}
+
+/* ---------- ステータス LED ---------- */
+
+.led-dot {
+  display: inline-block;
+  width: 7px;
   height: 7px;
-  border-radius: 3px;
-  background: var(--line);
-  position: relative;
-  transition: background 80ms linear, box-shadow 80ms linear;
+  border-radius: 2px;
+  background: var(--groove);
+  vertical-align: middle;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .meter-seg {
-    transition: none;
-  }
+.led-dot.on-amber {
+  background: var(--phosphor-amber);
+  box-shadow: var(--glow-amber);
+}
+.led-dot.on-cyan {
+  background: var(--phosphor-cyan);
+  box-shadow: var(--glow-cyan);
+}
+.led-dot.on-red {
+  background: var(--signal-red);
+  box-shadow: var(--glow-red);
 }
 
-.meter-seg.in-chest {
-  background: rgba(245, 184, 65, 0.35);
-}
-.meter-seg.in-falsetto {
-  background: rgba(127, 214, 255, 0.35);
-}
-.meter-seg.lit {
-  background: var(--accent);
-  box-shadow: 0 0 10px rgba(255, 77, 141, 0.8);
-}
-.meter-seg.marker-chest {
-  background: var(--chest);
-  box-shadow: 0 0 8px rgba(245, 184, 65, 0.7);
-}
-.meter-seg.marker-falsetto {
-  background: var(--falsetto);
-  box-shadow: 0 0 8px rgba(127, 214, 255, 0.7);
-}
-
-.meter-label {
-  position: absolute;
-  left: 72px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 10px;
-  color: var(--muted);
-  white-space: nowrap;
-  font-family: var(--font-led);
-}
-
-.note-display {
-  font-family: var(--font-led);
-  font-size: 44px;
-  color: var(--accent);
-  text-shadow: 0 0 16px rgba(255, 77, 141, 0.6);
-  min-height: 56px;
-}
-
-.note-sub {
-  color: var(--muted);
-  font-size: 13px;
-  min-height: 20px;
-}
-
-.hold-bar {
-  height: 8px;
-  background: var(--line);
-  border-radius: 999px;
-  overflow: hidden;
-  margin-top: 12px;
-}
-
-.hold-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--chest));
-  border-radius: 999px;
-}
-
-.range-summary {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 10px;
-  text-align: center;
-}
-
-.range-summary .val {
-  font-family: var(--font-led);
-  font-size: 20px;
-}
-
-.val-low {
-  color: var(--text);
-}
-.val-chest {
-  color: var(--chest);
-}
-.val-falsetto {
-  color: var(--falsetto);
-}
+/* ---------- 曲リスト ---------- */
 
 .song-row {
   display: flex;
@@ -285,13 +317,13 @@ button {
   justify-content: space-between;
   gap: 10px;
   padding: 12px 4px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--groove);
   width: 100%;
   background: none;
   border-left: none;
   border-right: none;
   border-top: none;
-  color: var(--text);
+  color: var(--ink);
   text-align: left;
 }
 
@@ -299,23 +331,8 @@ button {
   border-bottom: none;
 }
 
-.input {
-  width: 100%;
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  color: var(--text);
-  padding: 12px 14px;
-  font-size: 15px;
-  font-family: inherit;
-}
-
-.input::placeholder {
-  color: var(--muted);
-}
-
 .warn {
-  color: var(--chest);
+  color: var(--signal-red);
   font-size: 12px;
 }
 
@@ -326,8 +343,101 @@ button {
 }
 
 .section-label {
-  font-family: var(--font-led);
-  font-size: 13px;
-  color: var(--muted);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--etch);
   margin: 18px 0 8px;
+}
+
+/* ---------- ホールドバー(計器の細線) ---------- */
+
+.hold-bar {
+  height: 4px;
+  background: var(--groove);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+
+.hold-bar-fill {
+  height: 100%;
+  background: var(--phosphor-amber);
+  box-shadow: var(--glow-amber);
+}
+
+/* ---------- 銘板(ネームプレート) ---------- */
+
+.nameplate {
+  background: var(--faceplate);
+  border: 1px solid var(--groove);
+  border-top-color: rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 16px;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+}
+
+.nameplate-rule {
+  height: 1px;
+  background: var(--groove);
+  margin: 10px 0 12px;
+}
+
+.nameplate-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+}
+
+.nameplate-row .etch-label {
+  min-width: 76px;
+}
+
+/* HOLD 点滅(記録完了時に2回) */
+.hold-blink {
+  animation: hold-blink 360ms steps(1) 2;
+}
+@keyframes hold-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ---------- 起動シーケンス ---------- */
+
+.boot-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--chassis);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.boot-overlay.boot-out {
+  animation: boot-out 200ms linear forwards;
+}
+@keyframes boot-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* ---------- reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .page-fade,
+  .hold-blink,
+  .boot-overlay.boot-out {
+    animation: none;
+  }
 }

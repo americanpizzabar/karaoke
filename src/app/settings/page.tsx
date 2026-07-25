@@ -29,6 +29,9 @@ export default function SettingsPage() {
 
   return (
     <main>
+      <div className="etch-label" style={{ margin: "4px 0 14px" }}>
+        SETUP
+      </div>
       <h1 className="page-title">設定</h1>
 
       <section className="card">
@@ -60,8 +63,7 @@ export default function SettingsPage() {
         </p>
         {!confirming ? (
           <button
-            className="btn btn-block"
-            style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+            className="btn btn-block btn-danger"
             onClick={() => setConfirming(true)}
           >
             すべてのデータを削除
@@ -69,7 +71,7 @@ export default function SettingsPage() {
         ) : (
           <div className="grid-2">
             <button
-              className="btn btn-accent"
+              className="btn btn-danger"
               onClick={deleteAll}
               disabled={deleting}
             >

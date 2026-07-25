@@ -4,8 +4,8 @@
   "description": "音域測定×キー攻略×ボイトレのカラオケ攻略アプリ",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0A0D1F",
-  "theme_color": "#0A0D1F",
+  "background_color": "#15171C",
+  "theme_color": "#15171C",
   "lang": "ja",
   "icons": [
     {

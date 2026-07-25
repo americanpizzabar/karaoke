@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePitchDetector } from "@/hooks/usePitchDetector";
+import { TunerFace } from "@/components/TunerFace";
 import { midiToFreq, midiToKaraoke } from "@/lib/notes";
 import { fetchRangeHistory, useAppStore } from "@/store/useAppStore";
 
@@ -10,6 +11,7 @@ type MenuKey = "liproll" | "longtone" | "challenge" | "falsetto_slide";
 
 interface MenuDef {
   key: MenuKey;
+  engrave: string; // ラックユニットの刻印(英語大文字)
   title: string;
   desc: string;
   target: (chestLow: number, chestHigh: number) => number;
@@ -20,6 +22,7 @@ interface MenuDef {
 const MENUS: MenuDef[] = [
   {
     key: "liproll",
+    engrave: "LIP ROLL",
     title: "リップロール上昇",
     desc: "半音ずつ上がるガイド音に合わせてリップロール(唇プルプル)で発声",
     target: (lo, hi) => Math.min(lo + 7, hi - 1),
@@ -27,6 +30,7 @@ const MENUS: MenuDef[] = [
   },
   {
     key: "longtone",
+    engrave: "LONG TONE",
     title: "ロングトーン",
     desc: "地声最高音−2半音を5秒キープ。音程のブレを測定します",
     target: (_lo, hi) => hi - 2,
@@ -34,6 +38,7 @@ const MENUS: MenuDef[] = [
   },
   {
     key: "challenge",
+    engrave: "LIMIT CHALLENGE",
     title: "限界チャレンジ",
     desc: "地声最高音+1半音に挑戦。到達すると音域記録が更新されます",
     target: (_lo, hi) => hi + 1,
@@ -41,6 +46,7 @@ const MENUS: MenuDef[] = [
   },
   {
     key: "falsetto_slide",
+    engrave: "FALSETTO SLIDE",
     title: "裏声スライド",
     desc: "mid2域から裏声へスルッと切り替える練習。高い声が出ればOK",
     target: (_lo, hi) => hi + 3,
@@ -52,11 +58,25 @@ export default function TrainingPage() {
   const latest = useAppStore((s) => s.latestRange);
   const [loaded, setLoaded] = useState(false);
   const [activeMenu, setActiveMenu] = useState<MenuDef | null>(null);
+  const [achievedMenus, setAchievedMenus] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchRangeHistory()
       .catch(() => {})
       .finally(() => setLoaded(true));
+    // 達成状態LED用にトレーニングログを取得
+    fetch("/api/training")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d?.logs) return;
+        const done = new Set<string>(
+          d.logs
+            .filter((l: { achieved: boolean | null }) => l.achieved === true)
+            .map((l: { menu: string }) => l.menu)
+        );
+        setAchievedMenus(done);
+      })
+      .catch(() => {});
   }, []);
 
   const chestLow = latest?.chestLow ?? null;
@@ -75,6 +95,9 @@ export default function TrainingPage() {
 
   return (
     <main>
+      <div className="etch-label" style={{ margin: "4px 0 14px" }}>
+        TRAINING RACK
+      </div>
       <h1 className="page-title">トレーニング</h1>
       <p className="muted" style={{ marginBottom: 14 }}>
         1回3分。あなたの音域データに合わせたメニューです。
@@ -84,7 +107,7 @@ export default function TrainingPage() {
         <section className="card">
           <p>
             トレーニングには音域データが必要です。
-            <Link href="/measure" style={{ color: "var(--accent)" }}>
+            <Link href="/measure" style={{ color: "var(--phosphor-amber)" }}>
               まず音域を測定
             </Link>
             してください。
@@ -92,10 +115,12 @@ export default function TrainingPage() {
           {!loaded && <p className="muted">読み込み中...</p>}
         </section>
       ) : (
+        // 4メニューをラックの4Uユニットとして縦積み
         MENUS.map((m) => {
           const target = m.target(chestLow ?? chestHigh - 12, chestHigh);
+          const achieved = achievedMenus.has(m.key);
           return (
-            <section key={m.key} className="card">
+            <section key={m.key} className="card" style={{ marginBottom: 10 }}>
               <div
                 style={{
                   display: "flex",
@@ -104,17 +129,32 @@ export default function TrainingPage() {
                   gap: 10,
                 }}
               >
-                <div>
-                  <strong>{m.title}</strong>
+                <div style={{ minWidth: 0 }}>
+                  <div className="etch-label" style={{ marginBottom: 6 }}>
+                    <span
+                      className={`led-dot${achieved ? " on-amber" : ""}`}
+                      style={{ marginRight: 6 }}
+                    />
+                    {m.engrave}
+                  </div>
                   <p className="muted" style={{ marginTop: 2 }}>
                     {m.desc}
                   </p>
-                  <p className="led" style={{ marginTop: 6, color: "var(--chest)" }}>
+                  <p
+                    className="data"
+                    style={{
+                      marginTop: 6,
+                      fontSize: 13,
+                      color: "var(--phosphor-amber)",
+                      textShadow: "var(--glow-amber)",
+                    }}
+                  >
                     {m.targetLabel}: {midiToKaraoke(target)}
                   </p>
                 </div>
                 <button
                   className="btn btn-accent"
+                  style={{ whiteSpace: "nowrap" }}
                   onClick={() => setActiveMenu(m)}
                 >
                   開始
@@ -125,8 +165,8 @@ export default function TrainingPage() {
         })
       )}
 
-      <p className="muted" style={{ fontSize: 11 }}>
-        ※ 医学的・専門的判定ではありません。喉に痛みや違和感を感じたらすぐに中止してください。
+      <p className="muted" style={{ fontSize: 11, marginTop: 14 }}>
+        医学的・専門的判定ではありません。喉に痛みや違和感を感じたらすぐに中止してください。
       </p>
     </main>
   );
@@ -148,6 +188,7 @@ function TrainingSession({
   const { state, active, error, start, stop, getAudioContext } = usePitchDetector();
   const [status, setStatus] = useState<SessionStatus>("ready");
   const [message, setMessage] = useState("");
+  const [guideNote, setGuideNote] = useState<number | null>(null);
   const [outcome, setOutcome] = useState<{
     achieved: boolean;
     stabilityCents?: number;
@@ -235,6 +276,7 @@ function TrainingSession({
     }
     setStatus("running");
     setOutcome(null);
+    setGuideNote(target);
 
     if (menu.key === "liproll") {
       const startNote = Math.min(chestLow + 7, chestHigh - 1);
@@ -244,6 +286,7 @@ function TrainingSession({
       let hits = 0;
       for (const n of notes) {
         if (cancelledRef.current) return;
+        setGuideNote(n);
         setMessage(`ガイド音: ${midiToKaraoke(n)} — 続けて同じ高さで発声`);
         await playTone(n, 700);
         const samples = await capture(1200);
@@ -265,7 +308,7 @@ function TrainingSession({
       setMessage(`ガイド音を聞いて ${midiToKaraoke(target)} を5秒キープ`);
       await playTone(target, 1000);
       await wait(300);
-      setMessage(`発声中… ${midiToKaraoke(target)} をキープ!`);
+      setMessage(`発声中。${midiToKaraoke(target)} をキープ`);
       const samples = await capture(5000);
       const cents = samples.map((m) => (m - target) * 100).filter((c) => Math.abs(c) < 300);
       let achieved = false;
@@ -283,13 +326,13 @@ function TrainingSession({
         stabilityCents: stability,
         detail:
           stability !== undefined
-            ? `安定度: ±${stability.toFixed(0)}セント(35以内でクリア)`
+            ? `安定度 ±${stability.toFixed(0)}セント。35以内でクリアです`
             : "声を検出できませんでした。マイクとの距離を調整してください。",
       });
     }
 
     if (menu.key === "challenge") {
-      setMessage(`ガイド音を聞いて ${midiToKaraoke(target)} に挑戦!(15秒)`);
+      setMessage(`ガイド音を聞いて ${midiToKaraoke(target)} に挑戦(15秒)`);
       await playTone(target, 1000);
       await wait(300);
       const t0 = performance.now();
@@ -308,7 +351,7 @@ function TrainingSession({
           heldStart = null;
         }
         setMessage(
-          `${midiToKaraoke(target)} を1秒キープで達成!(残り${Math.ceil(
+          `${midiToKaraoke(target)} を1秒キープで達成(残り${Math.ceil(
             (15000 - (performance.now() - t0)) / 1000
           )}秒)`
         );
@@ -321,13 +364,14 @@ function TrainingSession({
       setOutcome({
         achieved,
         detail: achieved
-          ? `${midiToKaraoke(target)} に到達!音域記録を更新しました 🎉`
+          ? `${midiToKaraoke(target)} に到達。音域記録を更新しました`
           : "今回は届きませんでした。リップロールで温めてから再挑戦を。",
       });
     }
 
     if (menu.key === "falsetto_slide") {
       const slideStart = Math.min(64, chestHigh - 2); // mid2域
+      setGuideNote(slideStart);
       setMessage(
         `${midiToKaraoke(slideStart)} から上へ、裏声でスーッとスライド(10秒)`
       );
@@ -357,28 +401,58 @@ function TrainingSession({
       setOutcome({
         achieved,
         detail: achieved
-          ? `裏声域(${midiToKaraoke(Math.round(maxMidi))})を検出!`
+          ? `裏声域(${midiToKaraoke(Math.round(maxMidi))})を検出しました`
           : "地声域より上の音を検出できませんでした。力を抜いてもう一度。",
       });
     }
 
     setStatus("done");
     setMessage("");
+    setGuideNote(null);
   };
 
   return (
     <main>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          margin: "4px 0 14px",
+        }}
+      >
+        <span className="etch-label">{menu.engrave}</span>
+        <button
+          className="etch-label"
+          style={{ background: "none", border: "none" }}
+          onClick={() => {
+            stop();
+            onExit();
+          }}
+        >
+          EXIT
+        </button>
+      </div>
       <h1 className="page-title">{menu.title}</h1>
+
       <section className="card">
         <p className="muted">{menu.desc}</p>
-        <p className="led" style={{ marginTop: 8, color: "var(--chest)" }}>
+        <p
+          className="data"
+          style={{
+            marginTop: 8,
+            fontSize: 13,
+            color: "var(--phosphor-cyan)",
+            textShadow: "var(--glow-cyan)",
+          }}
+        >
           {menu.targetLabel}: {midiToKaraoke(target)}
         </p>
       </section>
 
       {error && (
         <section className="card">
-          <p className="warn">{error}</p>
+          <p className="warn">NO INPUT — {error}</p>
         </section>
       )}
 
@@ -390,22 +464,31 @@ function TrainingSession({
         )}
         {status === "running" && (
           <>
-            <p style={{ minHeight: 44 }}>{message}</p>
-            <div className="note-display">
-              {state.midi !== null ? midiToKaraoke(Math.round(state.midi)) : "‥‥"}
-            </div>
+            <p style={{ minHeight: 40, marginBottom: 12 }}>{message}</p>
+            {/* ターゲット音をcyanで固定表示 → 自分の音がamberで重なる(S5) */}
+            <TunerFace
+              midi={state.midi}
+              rms={state.rms}
+              recording
+              referenceMidi={guideNote ?? target}
+              targetLabel={midiToKaraoke(guideNote ?? target)}
+            />
           </>
         )}
         {status === "done" && outcome && (
           <>
             <p
-              className="led"
+              className="data"
               style={{
-                fontSize: 22,
-                color: outcome.achieved ? "var(--chest)" : "var(--muted)",
+                fontSize: 20,
+                letterSpacing: "0.1em",
+                color: outcome.achieved
+                  ? "var(--phosphor-amber)"
+                  : "var(--etch)",
+                textShadow: outcome.achieved ? "var(--glow-amber)" : undefined,
               }}
             >
-              {outcome.achieved ? "CLEAR!" : "MISS…"}
+              {outcome.achieved ? "CLEAR" : "MISS"}
             </p>
             <p style={{ marginTop: 6 }}>{outcome.detail}</p>
             <button
@@ -426,7 +509,7 @@ function TrainingSession({
           onExit();
         }}
       >
-        ← メニューに戻る
+        メニューに戻る
       </button>
       <p className="muted" style={{ fontSize: 11, marginTop: 10 }}>
         喉に痛みを感じたらすぐに中止してください。
