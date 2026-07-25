@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useAppStore } from "@/store/useAppStore";
+import { clearLocalData, useAppStore } from "@/store/useAppStore";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -16,6 +16,7 @@ export default function SettingsPage() {
     try {
       const res = await fetch("/api/account", { method: "DELETE" });
       if (!res.ok) throw new Error();
+      clearLocalData(); // 端末内保存(サーバー未接続時のフォールバック分)も削除
       invalidate();
       setMessage("すべてのデータを削除しました。");
       setConfirming(false);

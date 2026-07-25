@@ -33,15 +33,19 @@ turso db show onikiattack --url        # → TURSO_DATABASE_URL
 turso db tokens create onikiattack     # → TURSO_AUTH_TOKEN
 ```
 
-`.env.local` に設定:
+`.env.local`(Vercel の場合は Project Settings → Environment Variables)に設定:
 
 ```
-TURSO_DATABASE_URL="libsql://onikiattack-<org>.turso.io"
-TURSO_AUTH_TOKEN="..."
+TURSO_DATABASE_URL="libsql://<turso db show で表示された実際のURL>"
+TURSO_AUTH_TOKEN="<turso db tokens create で発行された実際のトークン>"
 AUTH_SECRET="ランダムな長い文字列"
 ```
 
-- 環境変数未設定の場合は `file:local.db`(ローカルSQLiteファイル)にフォールバックするため、Tursoなしでも開発可能です。
+> **注意:** `<org>` などのプレースホルダをそのまま貼り付けないでください。
+> `turso db show onikiattack --url` の出力(実際のURL)をそのまま設定します。
+
+- **Turso 未設定でもアプリは動作します(ローカルモード)。** 曲リストは同梱データから提供され、測定記録・トレーニングログは端末内(localStorage)に保存されます。複数端末での履歴共有が必要な場合のみ Turso を設定してください。
+- ローカル開発では環境変数未設定時に `file:local.db`(ローカルSQLiteファイル)へフォールバックします。
 - スキーマ作成と初期曲データ(約45曲・参考値)の投入は初回アクセス時に自動実行されます。
 
 ## プライバシー

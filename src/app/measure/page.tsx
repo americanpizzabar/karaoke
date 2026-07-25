@@ -8,7 +8,7 @@ import { TunerFace } from "@/components/TunerFace";
 import { SegmentDisplay } from "@/components/SegmentDisplay";
 import { Nameplate, exportNameplateImage } from "@/components/Nameplate";
 import { midiToKaraoke } from "@/lib/notes";
-import { fetchRangeHistory, useAppStore } from "@/store/useAppStore";
+import { saveRangeRecord, useAppStore } from "@/store/useAppStore";
 
 const HOLD_MS = 1600; // 同一音程(±1半音)をこの時間連続検出したら候補として記録(確定は手動)
 
@@ -38,6 +38,8 @@ interface Result {
   falsettoHigh: number | null;
 }
 
+type SaveState = "idle" | "saving" | "done" | "local" | "error";
+
 export default function MeasurePage() {
   const { state, active, error, start, stop } = usePitchDetector();
   const [phaseIdx, setPhaseIdx] = useState(0);
@@ -47,7 +49,7 @@ export default function MeasurePage() {
     falsettoHigh: null,
   });
   const [finished, setFinished] = useState(false);
-  const [saved, setSaved] = useState<"idle" | "saving" | "done" | "error">("idle");
+  const [saved, setSaved] = useState<SaveState>("idle");
   const [holdProgress, setHoldProgress] = useState(0);
   const [candidate, setCandidate] = useState<number | null>(null);
   const [sweepToken, setSweepToken] = useState(0);
@@ -288,11 +290,10 @@ function ResultView({
   onRestart,
 }: {
   result: Result;
-  saved: "idle" | "saving" | "done" | "error";
-  setSaved: (s: "idle" | "saving" | "done" | "error") => void;
+  saved: SaveState;
+  setSaved: (s: SaveState) => void;
   onRestart: () => void;
 }) {
-  const invalidate = useAppStore((s) => s.invalidateRange);
   const history = useAppStore((s) => s.rangeHistory);
   const savedOnce = useRef(false);
 
@@ -305,19 +306,11 @@ function ResultView({
       result.falsettoHigh !== null;
     if (!hasAny) return;
     setSaved("saving");
-    fetch("/api/range", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(result),
-    })
-      .then((r) => {
-        if (!r.ok) throw new Error();
-        invalidate();
-        fetchRangeHistory(true);
-        setSaved("done");
-      })
+    // サーバーDB未接続時は端末内(localStorage)に保存される
+    saveRangeRecord(result)
+      .then((mode) => setSaved(mode === "server" ? "done" : "local"))
       .catch(() => setSaved("error"));
-  }, [result, setSaved, invalidate]);
+  }, [result, setSaved]);
 
   const data = {
     ...result,
@@ -359,6 +352,8 @@ function ResultView({
             <p className="muted">
               {saved === "saving" && "保存中..."}
               {saved === "done" && "測定履歴に保存しました。"}
+              {saved === "local" &&
+                "LOCAL — この端末内に保存しました(サーバー未接続)。"}
               {saved === "error" && "保存に失敗しました(オフラインの可能性)。"}
               {saved === "idle" && "記録された音がないため保存されませんでした。"}
             </p>

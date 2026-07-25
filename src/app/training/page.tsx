@@ -5,7 +5,13 @@ import { useEffect, useRef, useState } from "react";
 import { usePitchDetector } from "@/hooks/usePitchDetector";
 import { TunerFace } from "@/components/TunerFace";
 import { midiToFreq, midiToKaraoke } from "@/lib/notes";
-import { fetchRangeHistory, useAppStore } from "@/store/useAppStore";
+import {
+  fetchRangeHistory,
+  fetchTrainingLogs,
+  saveRangeRecord,
+  saveTrainingLog,
+  useAppStore,
+} from "@/store/useAppStore";
 
 type MenuKey = "liproll" | "longtone" | "challenge" | "falsetto_slide";
 
@@ -64,15 +70,11 @@ export default function TrainingPage() {
     fetchRangeHistory()
       .catch(() => {})
       .finally(() => setLoaded(true));
-    // 達成状態LED用にトレーニングログを取得
-    fetch("/api/training")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (!d?.logs) return;
+    // 達成状態LED用にトレーニングログを取得(未接続時は端末内保存分)
+    fetchTrainingLogs()
+      .then((logs) => {
         const done = new Set<string>(
-          d.logs
-            .filter((l: { achieved: boolean | null }) => l.achieved === true)
-            .map((l: { menu: string }) => l.menu)
+          logs.filter((l) => l.achieved === true).map((l) => l.menu)
         );
         setAchievedMenus(done);
       })
@@ -243,31 +245,22 @@ function TrainingSession({
   };
 
   const saveLog = async (achieved: boolean, stabilityCents?: number) => {
-    await fetch("/api/training", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        menu: menu.key,
-        targetNote: target,
-        achieved,
-        stabilityCents: stabilityCents ?? null,
-      }),
+    // サーバーDB未接続時は端末内(localStorage)に保存される
+    await saveTrainingLog({
+      menu: menu.key,
+      targetNote: target,
+      achieved,
+      stabilityCents: stabilityCents ?? null,
     }).catch(() => {});
   };
 
   const updateRangeRecord = async (newChestHigh: number) => {
     const latest = useAppStore.getState().latestRange;
-    await fetch("/api/range", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chestLow: latest?.chestLow ?? null,
-        chestHigh: newChestHigh,
-        falsettoHigh: latest?.falsettoHigh ?? null,
-      }),
+    await saveRangeRecord({
+      chestLow: latest?.chestLow ?? null,
+      chestHigh: newChestHigh,
+      falsettoHigh: latest?.falsettoHigh ?? null,
     }).catch(() => {});
-    useAppStore.getState().invalidateRange();
-    fetchRangeHistory(true).catch(() => {});
   };
 
   const run = async () => {
