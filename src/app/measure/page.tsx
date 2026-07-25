@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePitchDetector } from "@/hooks/usePitchDetector";
 import { PitchMeter } from "@/components/PitchMeter";
+import { RMS_THRESHOLD } from "@/lib/pitch";
 import { midiToFreq, midiToFullLabel, midiToKaraoke, midiToScientific } from "@/lib/notes";
 import { fetchRangeHistory, useAppStore } from "@/store/useAppStore";
 
@@ -186,7 +187,32 @@ export default function MeasurePage() {
                 <div className="note-sub led">
                   {cur !== null
                     ? `${midiToScientific(cur)} / ${midiToFreq(Math.round(cur)).toFixed(0)}Hz`
-                    : "声を出してください"}
+                    : state.rms < RMS_THRESHOLD
+                      ? "声を出してください"
+                      : "音程を検出中…"}
+                </div>
+                <div style={{ marginTop: 10 }}>
+                  <div className="muted" style={{ fontSize: 10, marginBottom: 3 }}>
+                    MIC LEVEL
+                  </div>
+                  <div className="hold-bar" style={{ marginTop: 0, height: 5 }}>
+                    <div
+                      style={{
+                        height: "100%",
+                        borderRadius: 999,
+                        width: `${Math.min(100, (state.rms / 0.06) * 100)}%`,
+                        background:
+                          state.rms < RMS_THRESHOLD
+                            ? "var(--muted)"
+                            : "var(--falsetto)",
+                      }}
+                    />
+                  </div>
+                  {state.rms > 0 && state.rms < RMS_THRESHOLD && (
+                    <p className="warn" style={{ marginTop: 4 }}>
+                      入力音量が小さいようです。マイクに口を近づけて(20cmほど)、少し大きめに発声してください。
+                    </p>
+                  )}
                 </div>
                 <div
                   className="hold-bar"
