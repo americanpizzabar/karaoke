@@ -105,7 +105,7 @@ export default function SettingsPage() {
       </section>
 
       <p className="muted" style={{ fontSize: 11 }}>
-        音域アタック v0.1.0(MVP)— 曲データは参考値です。
+        音域アタック — 曲データは参考値です。
       </p>
     </main>
   );

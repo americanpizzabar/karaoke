@@ -429,6 +429,8 @@ button {
 
 .boot-overlay.boot-out {
   animation: boot-out 200ms linear forwards;
+  /* 消え際のタップを吸わせない */
+  pointer-events: none;
 }
 @keyframes boot-out {
   to {
