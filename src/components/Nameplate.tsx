@@ -1,6 +1,7 @@
 "use client";
 
 import { SegmentDisplay, segmentSvgMarkup } from "@/components/SegmentDisplay";
+import { formatDateJst } from "@/lib/dates";
 import { midiToKaraoke } from "@/lib/notes";
 
 /**
@@ -17,14 +18,17 @@ export interface NameplateData {
 }
 
 function spanSemitones(d: NameplateData): number | null {
-  const top = d.falsettoHigh ?? d.chestHigh;
-  if (top == null || d.chestLow == null) return null;
-  return top - d.chestLow;
+  // 裏声が地声最高音より低く記録される場合があるため、上端は両者の最大値を取る
+  const tops = [d.falsettoHigh, d.chestHigh].filter(
+    (v): v is number => v != null
+  );
+  if (tops.length === 0 || d.chestLow == null) return null;
+  return Math.max(...tops) - d.chestLow;
 }
 
 function fmtDate(iso: string | null): string {
-  if (!iso) return "—";
-  return `${iso.slice(0, 10)}  JST`;
+  const d = formatDateJst(iso);
+  return d ? `${d}  JST` : "—";
 }
 
 function fmtSerial(serial: number | null): string {

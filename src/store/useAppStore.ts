@@ -186,9 +186,29 @@ export async function saveTrainingLog(input: {
 export async function fetchSongs(): Promise<Song[]> {
   const { songs, setSongs } = useAppStore.getState();
   if (songs) return songs;
-  const res = await fetch("/api/songs");
-  if (!res.ok) throw new Error("songs fetch failed");
-  const data = await res.json();
-  setSongs(data.songs);
-  return data.songs;
+  try {
+    const res = await fetch("/api/songs");
+    if (!res.ok) throw new Error("songs fetch failed");
+    const data = await res.json();
+    setSongs(data.songs);
+    return data.songs;
+  } catch {
+    // 完全オフライン時も同梱の初期曲データで動作させる
+    const { SEED_SONGS } = await import("@/data/songs");
+    const local: Song[] = SEED_SONGS.map((s, i) => ({
+      id: `seed-${i}`,
+      title: s.title,
+      artist: s.artist,
+      chestMax: s.chestMax,
+      falsettoMax: s.falsettoMax ?? null,
+      lowest: s.lowest ?? null,
+      originalKey: s.originalKey ?? null,
+      isVerified: false,
+    })).sort(
+      (a, b) =>
+        a.artist.localeCompare(b.artist) || a.title.localeCompare(b.title)
+    );
+    setSongs(local);
+    return local;
+  }
 }

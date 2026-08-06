@@ -4,6 +4,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { detectPitch } from "@/lib/pitch";
 import { freqToMidiFloat } from "@/lib/notes";
 
+/** ピッチ解析の実行間隔(ms)。約30Hz。 */
+const ANALYSIS_INTERVAL_MS = 33;
+
+/**
+ * 解析窓のサンプル数。48kHzで約85ms分。
+ * lowlowA(55Hz)でも4周期以上入るため、低音の検出が安定する。
+ */
+const FFT_SIZE = 4096;
+
 export interface PitchState {
   freq: number | null;
   midi: number | null; // 浮動小数(セント込み)
@@ -36,11 +45,20 @@ export function usePitchDetector(): PitchDetector {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const rafRef = useRef<number>(0);
   const bufRef = useRef<Float32Array<ArrayBuffer> | null>(null);
+  const lastAnalysisRef = useRef(0);
 
   const loop = useCallback(() => {
     const analyser = analyserRef.current;
     const ctx = ctxRef.current;
     if (!analyser || !ctx) return;
+    rafRef.current = requestAnimationFrame(loop);
+
+    // 解析は約30Hzに間引く。自己相関はコストが高く、毎フレーム(60Hz)回すと
+    // 中位機で描画が詰まる。声の変化は30Hzで十分追える。
+    const now = performance.now();
+    if (now - lastAnalysisRef.current < ANALYSIS_INTERVAL_MS) return;
+    lastAnalysisRef.current = now;
+
     if (!bufRef.current) bufRef.current = new Float32Array(analyser.fftSize);
     const buf = bufRef.current;
     analyser.getFloatTimeDomainData(buf);
@@ -49,9 +67,8 @@ export function usePitchDetector(): PitchDetector {
       freq,
       midi: freq ? freqToMidiFloat(freq) : null,
       rms,
-      ts: performance.now(),
+      ts: now,
     });
-    rafRef.current = requestAnimationFrame(loop);
   }, []);
 
   const start = useCallback(async () => {
@@ -69,12 +86,13 @@ export function usePitchDetector(): PitchDetector {
       await ctx.resume();
       const source = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
-      analyser.fftSize = 2048;
+      analyser.fftSize = FFT_SIZE;
       source.connect(analyser);
 
       ctxRef.current = ctx;
       streamRef.current = stream;
       analyserRef.current = analyser;
+      lastAnalysisRef.current = 0; // 開始直後の1回は即座に解析する
       setActive(true);
       rafRef.current = requestAnimationFrame(loop);
     } catch (e) {

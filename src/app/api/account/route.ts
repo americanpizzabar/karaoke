@@ -21,9 +21,12 @@ export async function DELETE(req: NextRequest) {
     clearUserCookie(res);
     return res;
   } catch {
-    // DB未接続でもCookieは破棄する(端末内データはクライアント側で削除)
-    const res = NextResponse.json({ deleted: true, fallback: true });
-    clearUserCookie(res);
-    return res;
+    // DB未接続時に「成功」を返すとサーバー上の履歴が残ったまま
+    // Cookieだけ消えて孤立するため、失敗として返す。
+    // (端末内データの削除はクライアント側で行う)
+    return NextResponse.json(
+      { error: "db unavailable", fallback: true },
+      { status: 503 }
+    );
   }
 }

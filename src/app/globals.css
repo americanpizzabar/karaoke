@@ -7,7 +7,11 @@
   /* カラーパレット(2.1) */
   --chassis: #15171c; /* アプリ背景(機材の筐体色) */
   --faceplate: #1e2229; /* カード/パネル背景 */
-  --groove: #2a2f38; /* 罫線、目盛り、非アクティブLED */
+  --groove: #2a2f38; /* 罫線、目盛り、非アクティブLED(装飾のみ) */
+  /* 操作部品(ボタン・入力欄)の輪郭。装飾罫線と違い、境界そのものが
+     部品の存在を示すため WCAG 1.4.11 の 3:1 を満たす明度にしている
+     (faceplate 3.11:1 / chassis 3.49:1) */
+  --edge: #666e7d;
   --phosphor-amber: #ffb454; /* 地声。セグメント表示 */
   --phosphor-cyan: #7df0d4; /* 裏声。VFD管の発光色 */
   --signal-red: #e8442e; /* REC・警告・ピークのみ */
@@ -147,7 +151,7 @@ button {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid var(--groove);
+  border: 1px solid var(--edge);
   background: var(--faceplate);
   color: var(--ink);
   border-radius: 4px;
@@ -273,7 +277,7 @@ button {
 .input {
   width: 100%;
   background: var(--chassis);
-  border: 1px solid var(--groove);
+  border: 1px solid var(--edge);
   border-radius: 4px;
   color: var(--ink);
   padding: 12px 14px;

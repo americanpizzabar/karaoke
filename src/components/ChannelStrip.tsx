@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { midiToKaraoke } from "@/lib/notes";
 
 /**
@@ -25,13 +25,21 @@ interface Props {
 const LED_W = 26;
 const LABEL_W = 46;
 
-export function ChannelStrip({
+/**
+ * 目盛りの範囲は固定(実機の計器と同じく、歌っても目盛りが動かない)。
+ * ピッチ検出の下限 lowlowA(33)から hihiE(88)までを常に表示するため、
+ * 極端な低音・高音でも素子が範囲外になって消えることがない。
+ */
+const DEFAULT_MIN = 33;
+const DEFAULT_MAX = 88;
+
+function ChannelStripImpl({
   currentMidi,
   chestLow,
   chestHigh,
   falsettoHigh,
-  min = 40,
-  max = 84,
+  min = DEFAULT_MIN,
+  max = DEFAULT_MAX,
   sweepToken = 0,
   height = 320,
 }: Props) {
@@ -211,3 +219,21 @@ export function ChannelStrip({
     </div>
   );
 }
+
+/**
+ * 素子は半音単位でしか変化しないため、現在音の小数部が変わっただけでは
+ * 再描画しない(30Hzで56素子を作り直すと中位機で描画が詰まるため)。
+ */
+export const ChannelStrip = memo(ChannelStripImpl, (a, b) => {
+  const round = (v: number | null) => (v === null ? null : Math.round(v));
+  return (
+    round(a.currentMidi) === round(b.currentMidi) &&
+    a.chestLow === b.chestLow &&
+    a.chestHigh === b.chestHigh &&
+    a.falsettoHigh === b.falsettoHigh &&
+    a.min === b.min &&
+    a.max === b.max &&
+    a.sweepToken === b.sweepToken &&
+    a.height === b.height
+  );
+});

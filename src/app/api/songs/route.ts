@@ -32,23 +32,24 @@ export async function GET(req: NextRequest) {
     });
   } catch {
     // DB未設定・接続不可でも曲リストは同梱の初期データで提供する
+    // idは元配列のindexで採番(検索条件でidが変わらないようfilterより先にmap)
     const needle = q.toLowerCase();
-    const songs = SEED_SONGS.filter(
-      (s) =>
-        !needle ||
-        s.title.toLowerCase().includes(needle) ||
-        s.artist.toLowerCase().includes(needle)
-    )
-      .map((s, i) => ({
-        id: `seed-${i}`,
-        title: s.title,
-        artist: s.artist,
-        chestMax: s.chestMax,
-        falsettoMax: s.falsettoMax ?? null,
-        lowest: s.lowest ?? null,
-        originalKey: s.originalKey ?? null,
-        isVerified: false,
-      }))
+    const songs = SEED_SONGS.map((s, i) => ({
+      id: `seed-${i}`,
+      title: s.title,
+      artist: s.artist,
+      chestMax: s.chestMax,
+      falsettoMax: s.falsettoMax ?? null,
+      lowest: s.lowest ?? null,
+      originalKey: s.originalKey ?? null,
+      isVerified: false,
+    }))
+      .filter(
+        (s) =>
+          !needle ||
+          s.title.toLowerCase().includes(needle) ||
+          s.artist.toLowerCase().includes(needle)
+      )
       .sort(
         (a, b) =>
           a.artist.localeCompare(b.artist) || a.title.localeCompare(b.title)

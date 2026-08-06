@@ -70,7 +70,12 @@ export default function TrainingPage() {
     fetchRangeHistory()
       .catch(() => {})
       .finally(() => setLoaded(true));
-    // 達成状態LED用にトレーニングログを取得(未接続時は端末内保存分)
+  }, []);
+
+  // 達成状態LED用にトレーニングログを取得(未接続時は端末内保存分)。
+  // セッションから戻ったとき(activeMenu=null)にも再取得してLEDを更新する
+  useEffect(() => {
+    if (activeMenu !== null) return;
     fetchTrainingLogs()
       .then((logs) => {
         const done = new Set<string>(
@@ -79,10 +84,13 @@ export default function TrainingPage() {
         setAchievedMenus(done);
       })
       .catch(() => {});
-  }, []);
+  }, [activeMenu]);
 
-  const chestLow = latest?.chestLow ?? null;
   const chestHigh = latest?.chestHigh ?? null;
+  // 最低音は測定でスキップできるため、未記録なら地声最高音の1オクターブ下で代用する。
+  // (代用しないと最低音を飛ばした人はメニューを開始できなくなる)
+  const chestLow =
+    latest?.chestLow ?? (chestHigh !== null ? chestHigh - 12 : null);
 
   if (activeMenu && chestLow !== null && chestHigh !== null) {
     return (
@@ -119,7 +127,7 @@ export default function TrainingPage() {
       ) : (
         // 4メニューをラックの4Uユニットとして縦積み
         MENUS.map((m) => {
-          const target = m.target(chestLow ?? chestHigh - 12, chestHigh);
+          const target = m.target(chestLow!, chestHigh);
           const achieved = achievedMenus.has(m.key);
           return (
             <section key={m.key} className="card" style={{ marginBottom: 10 }}>

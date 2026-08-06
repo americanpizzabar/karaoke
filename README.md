@@ -59,11 +59,13 @@ AUTH_SECRET="ランダムな長い文字列"
 ```
 src/
   app/            画面(ホーム/測定/曲攻略/トレーニング/進捗/設定)+ APIルート
-  components/     Nav, PitchMeter(縦型LEDメーター)など
+  components/     SegmentDisplay(14セグ表示), TunerFace(チューナーフェイス),
+                  ChannelStrip(縦型LEDラダー), Nameplate(銘板+シェア画像),
+                  BootSequence(起動シーケンス), Nav
   hooks/          usePitchDetector(マイク+自己相関ピッチ検出)
-  lib/            notes(カラオケ表記変換), pitch, keyAdvice, db(Turso), auth
+  lib/            notes(カラオケ表記変換), pitch, keyAdvice, dates, db(Turso), auth
   data/           初期曲データ(参考値)
-  store/          Zustandストア
+  store/          Zustandストア(サーバー未接続時はlocalStorageフォールバック)
 public/           PWA manifest / Service Worker / アイコン
 ```
 

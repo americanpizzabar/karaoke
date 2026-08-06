@@ -119,6 +119,19 @@ export default function MeasurePage() {
     }
   }, [state, active, finished]);
 
+  /** 1つ前のステップへ戻り、その記録を破棄してやり直す */
+  const goBack = useCallback(() => {
+    if (phaseIdxRef.current === 0) return;
+    const prevIdx = phaseIdxRef.current - 1;
+    const key = PHASES[prevIdx].key;
+    setResult({ ...resultRef.current, [key]: null });
+    setPhaseIdx(prevIdx);
+    candidateRef.current = null;
+    samplesRef.current = [];
+    setHoldProgress(0);
+    setCandidate(null);
+  }, []);
+
   const restart = () => {
     setPhaseIdx(0);
     setResult({ chestLow: null, chestHigh: null, falsettoHigh: null });
@@ -261,6 +274,11 @@ export default function MeasurePage() {
               <button className="btn btn-ghost" onClick={() => advance(null)}>
                 スキップ
               </button>
+              {phaseIdx > 0 && (
+                <button className="btn btn-ghost" onClick={goBack}>
+                  前のステップ
+                </button>
+              )}
               <button
                 className="btn btn-ghost"
                 onClick={() => {
@@ -318,6 +336,13 @@ function ResultView({
     serial: history ? history.length : null, // 測定通し番号
   };
 
+  // 前回測定との地声最高音の差(履歴の先頭は今回の記録)
+  const prev = history && history.length > 1 ? history[1] : null;
+  const delta =
+    prev?.chestHigh != null && result.chestHigh != null
+      ? result.chestHigh - prev.chestHigh
+      : null;
+
   return (
     <main>
       <div
@@ -357,6 +382,21 @@ function ResultView({
               {saved === "error" && "保存に失敗しました(オフラインの可能性)。"}
               {saved === "idle" && "記録された音がないため保存されませんでした。"}
             </p>
+            {delta !== null && delta !== 0 && (
+              <p style={{ marginTop: 10, fontSize: 14 }}>
+                前回から地声最高音が{" "}
+                <strong
+                  className="data"
+                  style={{
+                    color:
+                      delta > 0 ? "var(--phosphor-amber)" : "var(--etch)",
+                  }}
+                >
+                  {delta > 0 ? `+${delta}` : delta}半音
+                </strong>{" "}
+                {delta > 0 ? "伸びました。" : "でした。"}
+              </p>
+            )}
           </div>
         </div>
       </section>

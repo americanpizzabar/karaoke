@@ -15,14 +15,24 @@ export default function SettingsPage() {
     setDeleting(true);
     try {
       const res = await fetch("/api/account", { method: "DELETE" });
-      if (!res.ok) throw new Error();
-      clearLocalData(); // 端末内保存(サーバー未接続時のフォールバック分)も削除
+      // 端末内保存(サーバー未接続時のフォールバック分)はどちらでも削除する
+      clearLocalData();
       invalidate();
-      setMessage("すべてのデータを削除しました。");
+      if (res.ok) {
+        setMessage("すべてのデータを削除しました。");
+      } else {
+        setMessage(
+          "この端末内のデータを削除しました(サーバー未接続のため、サーバー側は未削除の可能性があります)。"
+        );
+      }
       setConfirming(false);
-      setTimeout(() => router.push("/"), 1200);
+      setTimeout(() => router.push("/"), 1400);
     } catch {
-      setMessage("削除に失敗しました。通信環境を確認してください。");
+      clearLocalData();
+      invalidate();
+      setMessage("この端末内のデータを削除しました(オフライン)。");
+      setConfirming(false);
+      setTimeout(() => router.push("/"), 1400);
     } finally {
       setDeleting(false);
     }

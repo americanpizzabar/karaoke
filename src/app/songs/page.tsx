@@ -107,7 +107,11 @@ function SongsView() {
             <button
               key={s.id}
               className="song-row"
-              onClick={() => setSelected(s)}
+              onClick={() => {
+                setSelected(s);
+                // 詳細パネルはリスト上部に出るため、見える位置までスクロール
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
             >
               <span style={{ minWidth: 0 }}>
                 <strong
@@ -289,7 +293,7 @@ function SongDetail({
   const chestAdvice = chestHigh !== null ? judgeKey(chestHigh, song.chestMax) : null;
   const falsettoAdvice =
     falsettoHigh !== null && song.falsettoMax !== null
-      ? judgeKey(falsettoHigh, song.falsettoMax)
+      ? judgeKey(falsettoHigh, song.falsettoMax, "falsetto")
       : null;
 
   return (

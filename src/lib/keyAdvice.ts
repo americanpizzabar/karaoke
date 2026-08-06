@@ -2,6 +2,9 @@ import { midiToKaraoke } from "./notes";
 
 export type AdviceLevel = "easy" | "edge" | "shift" | "octave";
 
+/** 判定対象の声区。表示文面の「地声/裏声」を切り替える */
+export type VoiceType = "chest" | "falsetto";
+
 export interface KeyAdvice {
   level: AdviceLevel;
   diff: number; // user - song(半音)
@@ -16,8 +19,14 @@ export interface KeyAdvice {
  * chestDiff 0〜1  → 原キーでギリギリ可
  * chestDiff < 0   → キー ±n を推奨(下限 -7、超える場合はオクターブ下+キー)
  */
-export function judgeKey(userHigh: number, songMax: number): KeyAdvice {
+export function judgeKey(
+  userHigh: number,
+  songMax: number,
+  voice: VoiceType = "chest"
+): KeyAdvice {
   const diff = userHigh - songMax;
+  const voiceLabel = voice === "falsetto" ? "裏声" : "地声";
+
   if (diff >= 2) {
     return {
       level: "easy",
@@ -33,7 +42,10 @@ export function judgeKey(userHigh: number, songMax: number): KeyAdvice {
       diff,
       keyShift: 0,
       label: "原キーでギリギリ可",
-      detail: "サビ前に喉を温めてから挑みましょう。無理な張り上げに注意。",
+      detail:
+        voice === "falsetto"
+          ? "余裕は1半音以下です。息を混ぜて軽く当てると安定します。"
+          : "余裕は1半音以下です。サビ前に喉を温めてから挑みましょう。",
     };
   }
   if (diff >= -7) {
@@ -42,7 +54,7 @@ export function judgeKey(userHigh: number, songMax: number): KeyAdvice {
       diff,
       keyShift: diff,
       label: `キー ${diff} を推奨`,
-      detail: `最高音が ${-diff} 半音超えています。キー ${diff} なら地声圏内です。`,
+      detail: `最高音が ${-diff} 半音超えています。キー ${diff} なら${voiceLabel}で届きます。`,
     };
   }
   const octaveShift = diff + 12; // 1オクターブ下で歌う場合の+キー
@@ -51,7 +63,7 @@ export function judgeKey(userHigh: number, songMax: number): KeyAdvice {
     diff,
     keyShift: Math.max(diff, -7),
     label: `キー -7 または +${octaveShift}(オクターブ下)`,
-    detail: `差が ${-diff} 半音と大きいため、キー+${octaveShift} にして1オクターブ下で歌う方法も有効です。`,
+    detail: `差が ${-diff} 半音と大きいため、キー +${octaveShift} にして1オクターブ下で歌う方法も有効です。`,
   };
 }
 

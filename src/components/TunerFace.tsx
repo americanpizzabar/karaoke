@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { SegmentDisplay } from "@/components/SegmentDisplay";
 import { midiToFreq, midiToKaraoke, midiToScientific } from "@/lib/notes";
 import { RMS_THRESHOLD } from "@/lib/pitch";
@@ -72,6 +72,106 @@ function useSpringValue(target: number) {
   return value;
 }
 
+/* 計器の寸法(viewBox 260×104) */
+const CX = 130;
+const CY = 92;
+const NEEDLE_LEN = 74;
+
+/** 目盛りは不変なのでモジュール読み込み時に1度だけ作る */
+const GAUGE_TICKS = (() => {
+  const ticks = [];
+  for (let c = -50; c <= 50; c += 5) {
+    const long = c % 25 === 0;
+    const a = ((c / 50) * 45 - 90) * (Math.PI / 180);
+    const r1 = 80;
+    const r2 = long ? 68 : 74;
+    ticks.push(
+      <line
+        key={c}
+        x1={CX + r1 * Math.cos(a)}
+        y1={CY + r1 * Math.sin(a)}
+        x2={CX + r2 * Math.cos(a)}
+        y2={CY + r2 * Math.sin(a)}
+        stroke={c === 0 ? "var(--phosphor-amber)" : "var(--groove)"}
+        strokeWidth={c === 0 ? 1.5 : 1}
+      />
+    );
+  }
+  return ticks;
+})();
+
+/**
+ * セント偏差の計器。針のバネ物理は60Hzで値が変わるため、
+ * 親から切り離して この小さなSVGだけが再描画されるようにする。
+ */
+const CentsGauge = memo(function CentsGauge({
+  cents,
+  hasSignal,
+}: {
+  cents: number;
+  hasSignal: boolean;
+}) {
+  const needleCents = useSpringValue(cents);
+  const rad = (((needleCents / 50) * 45 - 90) * Math.PI) / 180;
+  const nx = CX + NEEDLE_LEN * Math.cos(rad);
+  const ny = CY + NEEDLE_LEN * Math.sin(rad);
+
+  return (
+    <svg
+      viewBox="0 0 260 104"
+      style={{ width: "100%", display: "block" }}
+      role="img"
+      aria-label={
+        hasSignal
+          ? `セント偏差 ${cents >= 0 ? "+" : ""}${cents.toFixed(0)}`
+          : "セント偏差 計測待ち"
+      }
+    >
+      {GAUGE_TICKS}
+      <text x={CX - 86} y={30} fill="var(--etch)" fontSize="9" fontFamily="var(--font-data)">
+        -50
+      </text>
+      <text x={CX + 70} y={30} fill="var(--etch)" fontSize="9" fontFamily="var(--font-data)">
+        +50
+      </text>
+      {/* 針(グローは二重線。垂直線+SVGフィルタは領域が空になり消えるため) */}
+      {hasSignal && (
+        <line
+          x1={CX}
+          y1={CY}
+          x2={nx}
+          y2={ny}
+          stroke="var(--phosphor-amber)"
+          strokeOpacity={0.3}
+          strokeWidth={5}
+          strokeLinecap="round"
+        />
+      )}
+      <line
+        x1={CX}
+        y1={CY}
+        x2={nx}
+        y2={ny}
+        stroke={hasSignal ? "var(--phosphor-amber)" : "var(--groove)"}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+      />
+      <circle cx={CX} cy={CY} r={3} fill="var(--groove)" />
+      <text
+        x={CX}
+        y={102}
+        fill="var(--etch)"
+        fontSize="9"
+        letterSpacing="1.2"
+        textAnchor="middle"
+        fontFamily="var(--font-body)"
+      >
+        CENTS
+      </text>
+    </svg>
+  );
+});
+
 export function TunerFace({
   midi,
   rms,
@@ -92,45 +192,18 @@ export function TunerFace({
         )
       )
     : 0;
-  const needleCents = useSpringValue(cents);
 
-  // 入力レベルVU: RMS→12素子。ピーク素子のみ signal-red(ホールド付き)
+  // 入力レベルVU: RMS→12素子。ピーク素子のみ signal-red(900msホールド)
   const litCount = Math.min(12, Math.round((rms / 0.06) * 12));
-  const peakRef = useRef(0);
+  const [peak, setPeak] = useState(0);
   const peakTsRef = useRef(0);
-  if (litCount >= peakRef.current || performance.now() - peakTsRef.current > 900) {
-    peakRef.current = litCount;
-    peakTsRef.current = performance.now();
-  }
-  const peak = peakRef.current;
-
-  // 針の描画(-50〜+50 → -45°〜+45°)
-  const angle = (needleCents / 50) * 45;
-  const cx = 130;
-  const cy = 92;
-  const needleLen = 74;
-  const rad = ((angle - 90) * Math.PI) / 180;
-  const nx = cx + needleLen * Math.cos(rad);
-  const ny = cy + needleLen * Math.sin(rad);
-
-  const ticks = [];
-  for (let c = -50; c <= 50; c += 5) {
-    const long = c % 25 === 0;
-    const a = ((c / 50) * 45 - 90) * (Math.PI / 180);
-    const r1 = 80;
-    const r2 = long ? 68 : 74;
-    ticks.push(
-      <line
-        key={c}
-        x1={cx + r1 * Math.cos(a)}
-        y1={cy + r1 * Math.sin(a)}
-        x2={cx + r2 * Math.cos(a)}
-        y2={cy + r2 * Math.sin(a)}
-        stroke={c === 0 ? "var(--phosphor-amber)" : "var(--groove)"}
-        strokeWidth={c === 0 ? 1.5 : 1}
-      />
-    );
-  }
+  useEffect(() => {
+    const now = performance.now();
+    if (litCount >= peak || now - peakTsRef.current > 900) {
+      peakTsRef.current = now;
+      setPeak(litCount);
+    }
+  }, [litCount, peak]);
 
   return (
     <div>
@@ -181,7 +254,7 @@ export function TunerFace({
             value={note !== null ? midiToKaraoke(note) : "----"}
             color="amber"
             cellHeight={64}
-            chars={7}
+            chars={8}
             fluid
             aria-label={
               note !== null
@@ -228,70 +301,7 @@ export function TunerFace({
 
         {/* セント偏差針 */}
         <div style={{ borderTop: "1px solid var(--groove)", marginTop: 8 }}>
-          <svg
-            viewBox="0 0 260 104"
-            style={{ width: "100%", display: "block" }}
-            role="img"
-            aria-label={
-              hasSignal
-                ? `セント偏差 ${cents >= 0 ? "+" : ""}${cents.toFixed(0)}`
-                : "セント偏差 計測待ち"
-            }
-          >
-            {ticks}
-            <text
-              x={cx - 86}
-              y={30}
-              fill="var(--etch)"
-              fontSize="9"
-              fontFamily="var(--font-data)"
-            >
-              -50
-            </text>
-            <text
-              x={cx + 70}
-              y={30}
-              fill="var(--etch)"
-              fontSize="9"
-              fontFamily="var(--font-data)"
-            >
-              +50
-            </text>
-            {/* 針(グローは二重線。垂直線+SVGフィルタは領域が空になり消えるため) */}
-            {hasSignal && (
-              <line
-                x1={cx}
-                y1={cy}
-                x2={nx}
-                y2={ny}
-                stroke="var(--phosphor-amber)"
-                strokeOpacity={0.3}
-                strokeWidth={5}
-                strokeLinecap="round"
-              />
-            )}
-            <line
-              x1={cx}
-              y1={cy}
-              x2={nx}
-              y2={ny}
-              stroke={hasSignal ? "var(--phosphor-amber)" : "var(--groove)"}
-              strokeWidth={1.5}
-              strokeLinecap="round"
-            />
-            <circle cx={cx} cy={cy} r={3} fill="var(--groove)" />
-            <text
-              x={cx}
-              y={102}
-              fill="var(--etch)"
-              fontSize="9"
-              letterSpacing="1.2"
-              textAnchor="middle"
-              fontFamily="var(--font-body)"
-            >
-              CENTS
-            </text>
-          </svg>
+          <CentsGauge cents={cents} hasSignal={hasSignal} />
         </div>
       </div>
 

@@ -12,6 +12,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { midiToKaraoke } from "@/lib/notes";
+import { formatDateTimeJst, formatMonthDayJst } from "@/lib/dates";
 import { classifySingable } from "@/lib/keyAdvice";
 import {
   fetchRangeHistory,
@@ -35,7 +36,7 @@ export default function ProgressPage() {
     return [...history]
       .reverse()
       .map((r) => ({
-        date: (r.measuredAt ?? "").slice(5, 10).replace("-", "/"),
+        date: formatMonthDayJst(r.measuredAt),
         最低音: r.chestLow,
         地声最高: r.chestHigh,
         裏声最高: r.falsettoHigh,
@@ -134,12 +135,13 @@ export default function ProgressPage() {
                       typeof v === "number" ? midiToKaraoke(v) : "—"
                     }
                   />
+                  {/* 測定1回のみのときは線が描けないため点を表示する */}
                   <Line
                     type="linear"
                     dataKey="地声最高"
                     stroke="#FFB454"
                     strokeWidth={1.5}
-                    dot={false}
+                    dot={chartData.length < 2 ? { r: 2.5, fill: "#FFB454", strokeWidth: 0 } : false}
                     connectNulls
                   />
                   <Line
@@ -147,7 +149,7 @@ export default function ProgressPage() {
                     dataKey="裏声最高"
                     stroke="#7DF0D4"
                     strokeWidth={1.5}
-                    dot={false}
+                    dot={chartData.length < 2 ? { r: 2.5, fill: "#7DF0D4", strokeWidth: 0 } : false}
                     connectNulls
                   />
                   <Line
@@ -155,7 +157,7 @@ export default function ProgressPage() {
                     dataKey="最低音"
                     stroke="#868D99"
                     strokeWidth={1.5}
-                    dot={false}
+                    dot={chartData.length < 2 ? { r: 2.5, fill: "#868D99", strokeWidth: 0 } : false}
                     connectNulls
                   />
                 </LineChart>
@@ -232,7 +234,7 @@ export default function ProgressPage() {
             </div>
             {history.slice(0, 10).map((r) => (
               <p key={r.id} className="muted data" style={{ padding: "4px 0", fontSize: 12 }}>
-                {(r.measuredAt ?? "").slice(0, 16).replace("T", " ")} —{" "}
+                {formatDateTimeJst(r.measuredAt) ?? "—"} —{" "}
                 {r.chestLow != null ? midiToKaraoke(r.chestLow) : "—"} 〜{" "}
                 <span style={{ color: "var(--phosphor-amber)" }}>
                   {r.chestHigh != null ? midiToKaraoke(r.chestHigh) : "—"}

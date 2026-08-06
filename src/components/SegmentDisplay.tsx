@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 
 /**
  * カスタムSVG 14セグメント表示(仕様書 4.1 / 7章)。
@@ -79,9 +79,13 @@ const CHAR_MAP: Record<string, string[]> = {
   X: ["h", "j", "k", "m"],
   Y: ["h", "j", "l"],
   Z: ["a", "d", "j", "k"],
-  /* 小文字グリフ(カラオケ表記 hi / mid / low 用) */
+  /* 小文字グリフ(カラオケ表記 lowlow / low / mid1 / mid2 / hi / hihi 用)。
+     大文字にフォールバックすると "MId2G" のように字面が崩れるため、
+     表記に使う文字はすべて小文字グリフを持たせる。 */
   h: ["e", "f", "g1", "g2", "c"],
   i: ["l"],
+  // 中央バー + 3本の脚で 14セグ上の小文字 m を作る
+  m: ["g1", "g2", "e", "l", "c"],
   d: ["b", "c", "d", "e", "g1", "g2"],
   o: ["c", "d", "e", "g1", "g2"],
   w: ["b", "c", "e", "f", "k", "m"],
@@ -199,7 +203,7 @@ export function SegmentGlowDefs() {
   );
 }
 
-export function SegmentDisplay({
+function SegmentDisplayImpl({
   value,
   color = "amber",
   cellHeight = 40,
@@ -295,3 +299,10 @@ export function SegmentDisplay({
     </svg>
   );
 }
+
+/**
+ * 表示文字が変わらない限り再描画しない。
+ * 親(チューナーフェイス)は針の物理演算で60Hz再描画されるため、
+ * メモ化しないとセグメントのSVGを毎フレーム作り直すことになる。
+ */
+export const SegmentDisplay = memo(SegmentDisplayImpl);
