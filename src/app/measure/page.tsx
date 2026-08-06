@@ -58,6 +58,7 @@ export default function MeasurePage() {
   const [sweepToken, setSweepToken] = useState(0);
 
   const candidateRef = useRef<number | null>(null);
+  const lastCapturedRef = useRef<number | null>(null);
   const holdStartRef = useRef(0);
   const samplesRef = useRef<number[]>([]);
   const phaseIdxRef = useRef(0);
@@ -71,6 +72,7 @@ export default function MeasurePage() {
       const next = { ...resultRef.current, [key]: recorded };
       setResult(next);
       candidateRef.current = null;
+      lastCapturedRef.current = null;
       samplesRef.current = [];
       setHoldProgress(0);
       setCandidate(null);
@@ -109,7 +111,11 @@ export default function MeasurePage() {
         const median = sorted[Math.floor(sorted.length / 2)];
         const note = Math.round(median);
         setCandidate(note);
-        setSweepToken((t) => t + 1); // 記録完了: ストリップ点灯 + HOLD 点滅
+        // 同じ音を歌い続けている間、点灯演出を2秒ごとに繰り返さない
+        if (lastCapturedRef.current !== note) {
+          lastCapturedRef.current = note;
+          setSweepToken((t) => t + 1); // 記録完了: ストリップ点灯 + HOLD 点滅
+        }
         candidateRef.current = null;
         samplesRef.current = [];
         setHoldProgress(0);
@@ -130,6 +136,7 @@ export default function MeasurePage() {
     setResult({ ...resultRef.current, [key]: null });
     setPhaseIdx(prevIdx);
     candidateRef.current = null;
+    lastCapturedRef.current = null;
     samplesRef.current = [];
     setHoldProgress(0);
     setCandidate(null);
@@ -142,6 +149,7 @@ export default function MeasurePage() {
     setSaved("idle");
     setCandidate(null);
     candidateRef.current = null;
+    lastCapturedRef.current = null;
   };
 
   if (finished) {
