@@ -1,21 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
-import { attachUserCookie, resolveUser } from "@/lib/auth";
+import { ensureDbReady, getDb } from "@/lib/db";
+import { attachUserCookie, readUserId, resolveUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
 const MENUS = ["liproll", "longtone", "challenge", "falsetto_slide"] as const;
 
 export async function GET(req: NextRequest) {
+  // 読み取りではIDを発行しない(発行するとCookieの競合でデータが迷子になる)
+  const userId = readUserId(req);
+  if (!userId) return NextResponse.json({ logs: [] });
   try {
-    const session = await resolveUser(req);
+    await ensureDbReady();
     const rows = await getDb().execute({
       sql: `select id, menu, target_note, achieved, stability_cents, done_at
             from training_logs where user_id = ?
             order by done_at desc, rowid desc limit 200`,
-      args: [session.userId],
+      args: [userId],
     });
-    const res = NextResponse.json({
+    return NextResponse.json({
       logs: rows.rows.map((r) => ({
         id: r.id,
         menu: r.menu,
@@ -25,8 +28,6 @@ export async function GET(req: NextRequest) {
         doneAt: r.done_at,
       })),
     });
-    if (session.isNew) attachUserCookie(res, session.userId);
-    return res;
   } catch {
     // DB未接続時はクライアントが端末内保存(localStorage)へフォールバックする
     return NextResponse.json({ logs: [], fallback: true });

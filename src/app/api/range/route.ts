@@ -1,20 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
-import { attachUserCookie, resolveUser } from "@/lib/auth";
+import { ensureDbReady, getDb } from "@/lib/db";
+import { attachUserCookie, readUserId, resolveUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
+  // 読み取りではIDを発行しない(発行するとCookieの競合でデータが迷子になる)
+  const userId = readUserId(req);
+  if (!userId) return NextResponse.json({ records: [] });
   try {
-    const session = await resolveUser(req);
+    await ensureDbReady();
     const limit = Math.min(Number(req.nextUrl.searchParams.get("limit") ?? 100), 500);
     const rows = await getDb().execute({
       sql: `select id, chest_low, chest_high, falsetto_high, measured_at
             from range_records where user_id = ?
             order by measured_at desc, rowid desc limit ?`,
-      args: [session.userId, limit],
+      args: [userId, limit],
     });
-    const res = NextResponse.json({
+    return NextResponse.json({
       records: rows.rows.map((r) => ({
         id: r.id,
         chestLow: r.chest_low,
@@ -23,8 +26,6 @@ export async function GET(req: NextRequest) {
         measuredAt: r.measured_at,
       })),
     });
-    if (session.isNew) attachUserCookie(res, session.userId);
-    return res;
   } catch {
     // DB未接続時はクライアントが端末内保存(localStorage)へフォールバックする
     return NextResponse.json({ records: [], fallback: true });

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePitchDetector } from "@/hooks/usePitchDetector";
 import { TunerFace } from "@/components/TunerFace";
 import { midiToFreq, midiToKaraoke } from "@/lib/notes";
+import { effectiveChestLow } from "@/lib/range";
 import {
   fetchRangeHistory,
   fetchTrainingLogs,
@@ -87,10 +88,8 @@ export default function TrainingPage() {
   }, [activeMenu]);
 
   const chestHigh = latest?.chestHigh ?? null;
-  // 最低音は測定でスキップできるため、未記録なら地声最高音の1オクターブ下で代用する。
-  // (代用しないと最低音を飛ばした人はメニューを開始できなくなる)
-  const chestLow =
-    latest?.chestLow ?? (chestHigh !== null ? chestHigh - 12 : null);
+  // 最低音は測定でスキップできる。代用しないとメニューを開始できなくなるため補完する
+  const chestLow = effectiveChestLow(latest?.chestLow, chestHigh);
 
   if (activeMenu && chestLow !== null && chestHigh !== null) {
     return (

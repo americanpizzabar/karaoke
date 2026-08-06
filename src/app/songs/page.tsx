@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { judgeKey, type KeyAdvice } from "@/lib/keyAdvice";
 import { midiToKaraoke } from "@/lib/notes";
+import { effectiveChestLow } from "@/lib/range";
 import { SegmentDisplay } from "@/components/SegmentDisplay";
 import {
   fetchRangeHistory,
@@ -154,7 +155,7 @@ function SongsView() {
  */
 function PatchBay({
   song,
-  chestLow,
+  chestLow: rawChestLow,
   chestHigh,
   falsettoHigh,
 }: {
@@ -163,6 +164,8 @@ function PatchBay({
   chestHigh: number | null;
   falsettoHigh: number | null;
 }) {
+  // 最低音が未測定でも自分の音域バーが消えないよう補完する
+  const chestLow = effectiveChestLow(rawChestLow, chestHigh);
   const songLow = song.lowest ?? song.chestMax - 14;
   const songHigh = Math.max(song.chestMax, song.falsettoMax ?? song.chestMax);
   const lo =
@@ -187,12 +190,15 @@ function PatchBay({
       />
     );
     if (long) {
+      // 端の目盛りラベルが図の外にはみ出して欠けないよう寄せる
+      const px = x(n);
+      const anchor = px < 26 ? "start" : px > W - 26 ? "end" : "middle";
       ticks.push(
         <text
           key={`t-${n}`}
-          x={x(n)}
+          x={anchor === "start" ? 2 : anchor === "end" ? W - 2 : px}
           y={76}
-          textAnchor="middle"
+          textAnchor={anchor}
           fill="var(--etch)"
           fontSize={8.5}
           fontFamily="var(--font-data)"

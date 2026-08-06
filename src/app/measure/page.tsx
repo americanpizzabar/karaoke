@@ -10,7 +10,10 @@ import { Nameplate, exportNameplateImage } from "@/components/Nameplate";
 import { midiToKaraoke } from "@/lib/notes";
 import { saveRangeRecord, useAppStore } from "@/store/useAppStore";
 
-const HOLD_MS = 1600; // 同一音程(±1半音)をこの時間連続検出したら候補として記録(確定は手動)
+// 同一音程(±1半音)をこの時間連続検出したら候補として記録(確定は手動)。
+// 画面の案内文「2秒キープ」と一致させること
+const HOLD_MS = 2000;
+const HOLD_SEC_LABEL = "2";
 
 type PhaseKey = "chestLow" | "chestHigh" | "falsettoHigh";
 
@@ -252,7 +255,7 @@ export default function MeasurePage() {
                 />
               ) : (
                 <span className="muted">
-                  同じ音を{(HOLD_MS / 1000).toFixed(1)}秒キープで記録
+                  同じ音を{HOLD_SEC_LABEL}秒キープで記録
                 </span>
               )}
             </div>
